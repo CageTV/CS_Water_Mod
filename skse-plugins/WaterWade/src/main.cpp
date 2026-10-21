@@ -1,6 +1,8 @@
 // WaterWade: actors wading or swimming are slowed by how deep they are in the water (armor adds to the swim penalty), and the
 // splash rings around the player grow with how fast the player moves through the water.
 #include "PCH.h"
+#include "Menu.h"
+#include "ShipWake.h"
 
 namespace
 {
@@ -9,6 +11,7 @@ namespace
 	struct Config
 	{
 		bool  slowEnabled{ true };
+		bool  yieldToWadeInWater{ true }; // Wade In Water Redone (WadeInWater.dll) does the same job: when it is loaded, leave the slowdown to it
 		bool  playerOnly{ false };
 		float smallSlowdown{ 8.0f };      // percent at ankle depth (submerged level 0.2)
 		float largeSlowdown{ 25.0f };     // percent at about waist depth (submerged level 0.55)
@@ -71,6 +74,7 @@ namespace
 			trim(val);
 			const float f = static_cast<float>(std::atof(val.c_str()));
 			if (key == "bSlowdown") c.slowEnabled = Truthy(val);
+			else if (key == "bYieldToWadeInWater") c.yieldToWadeInWater = Truthy(val);
 			else if (key == "bPlayerOnly") c.playerOnly = Truthy(val);
 			else if (key == "fSmallSlowdownPercent") c.smallSlowdown = f;
 			else if (key == "fLargeSlowdownPercent") c.largeSlowdown = f;
@@ -139,6 +143,7 @@ namespace
 	std::atomic<float>            g_quadSeen{ 0.0f };   // what the setting held at the start of the tick, before this plugin wrote it
 
 	std::shared_ptr<const Config> Cfg() { return std::atomic_load(&g_config); }
+	std::shared_ptr<const ShipWake::Config> g_shipCfg = std::make_shared<ShipWake::Config>();
 
 	float Smooth(float t)
 	{
@@ -198,6 +203,8 @@ namespace
 		return std::clamp(1.0f - slow, c.minSpeed, 1.0f);
 	}
 
+	std::atomic<bool> g_wadeInWaterLoaded{ false };   // WadeInWater.dll is in the process (checked once the game data is loaded)
+
 	struct SpeedHook
 	{
 		static float thunk(RE::Actor* a_actor)
@@ -210,7 +217,7 @@ namespace
 			if (a_actor->IsPlayerRef()) {
 				g_lastPlayerOriginal = original;
 			}
-			if (!c->slowEnabled || (c->playerOnly && !a_actor->IsPlayerRef())) {
+			if (!c->slowEnabled || (c->yieldToWadeInWater && g_wadeInWaterLoaded.load(std::memory_order_relaxed)) || (c->playerOnly && !a_actor->IsPlayerRef())) {
 				return original;
 			}
 			const float level = a_actor->GetSubmergedLevel(a_actor->GetPositionZ(), a_actor->GetParentCell());
@@ -307,6 +314,7 @@ namespace
 			return;
 		}
 		const auto c = Cfg();
+		ShipWake::Update(a_dt, player, ws, *std::atomic_load(&g_shipCfg), [player](std::uint32_t f, const RE::NiPoint3& at, float sc, float life) { PlaceSplash(player, f, at, sc, life); });
 		const auto pos = player->GetPosition();
 		float      speed = 0.0f;
 		if (haveLast && a_dt > 0.001f) {
@@ -487,7 +495,12 @@ namespace
 	void OnMessage(SKSE::MessagingInterface::Message* a_msg)
 	{
 		if (a_msg->type == SKSE::MessagingInterface::kDataLoaded) {
-			logger::info("WaterWade 0.1 on game {}", REL::Module::get().version().string());
+			logger::info("WaterWade 1.0.0 on game {}", REL::Module::get().version().string());
+				WaterWadeMenu::Register();
+				if (::GetModuleHandleW(L"WadeInWater.dll")) {
+					g_wadeInWaterLoaded = true;
+					logger::info("Wade In Water Redone (WadeInWater.dll) is loaded: WaterWade leaves the wading slowdown to it (bYieldToWadeInWater in WaterWade.ini; splashes and the wake still work)");
+				}
 			std::thread([]() {
 				auto prev = std::chrono::steady_clock::now();
 				auto lastCfg = prev;
@@ -497,6 +510,7 @@ namespace
 					if (now - lastCfg >= 1s) {
 						lastCfg = now;
 						std::atomic_store(&g_config, std::make_shared<const Config>(ReadConfig()));
+						std::atomic_store(&g_shipCfg, std::make_shared<const ShipWake::Config>(ShipWake::ReadConfig(kIniPath)));
 					}
 					const float dt = std::chrono::duration<float>(now - prev).count();
 					prev = now;

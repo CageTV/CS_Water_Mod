@@ -13,6 +13,7 @@
 // Works with any water renderer (vanilla, Community Shaders, Open Shaders, ENB): it edits water records and water materials only.
 
 #include "PCH.h"
+#include "Menu.h"
 
 namespace
 {
@@ -205,6 +206,49 @@ namespace
 		}
 	}
 
+	// diagnostic: find the LOD water (terrain LOD water shapes) and log whether the engine scrolls its material
+	void ScanLodWater(RE::NiAVObject* a_obj, const char* a_root, int a_depth, int& a_found, const RE::TESWaterSystem& a_ws)
+	{
+		if (!a_obj || a_depth > 10 || a_found > 24) {
+			return;
+		}
+		if (auto* geom = netimmerse_cast<RE::BSGeometry*>(a_obj)) {
+			auto* prop = netimmerse_cast<RE::BSWaterShaderProperty*>(geom->GetGeometryRuntimeData().shaderProperty.get());
+			if (!prop || !prop->material || prop->material->GetType() != RE::BSShaderMaterial::Type::kWater) {
+				return;
+			}
+			auto*                     m = static_cast<RE::BSWaterShaderMaterial*>(prop->material);
+			static std::map<const void*, RE::NiPoint2> prev;
+			bool                                       isObject = false;
+			for (auto& o : a_ws.waterObjects) {
+				isObject = isObject || (o && o->shape.get() == a_obj);
+			}
+			auto&      p = prev[m];
+			const bool moving = std::fabs(m->normalScroll1.x - p.x) > 1e-7f || std::fabs(m->normalScroll1.y - p.y) > 1e-7f;
+			p = m->normalScroll1;
+			++a_found;
+			logger::info("LODSCAN [{}] depth {} shape '{}' material {:p} inWaterObjects={} tex1={} tex2={} scroll1=({:.4f},{:.4f}) moving={} amp=({:.2f},{:.2f},{:.2f}) uvScale=({:.0f},{:.0f},{:.0f}) propFlags={:#x} center=({:.0f},{:.0f},{:.0f}) radius={:.0f} distToPlayer={:.0f}",
+				a_root, a_depth, a_obj->name.c_str(), static_cast<const void*>(m), isObject, m->normalTexture1 ? m->normalTexture1->name.c_str() : "NULL",
+				m->normalTexture2 ? m->normalTexture2->name.c_str() : "NULL", m->normalScroll1.x, m->normalScroll1.y, moving, m->amplitudeA[0], m->amplitudeA[1], m->amplitudeA[2],
+				m->uvScaleA[0], m->uvScaleA[1], m->uvScaleA[2], prop->flags.underlying(), geom->worldBound.center.x, geom->worldBound.center.y, geom->worldBound.center.z, geom->worldBound.radius,
+				[&]() {
+					const auto* pl = RE::PlayerCharacter::GetSingleton();
+					if (!pl) {
+						return 0.0f;
+					}
+					const auto p = pl->GetPosition();
+					const float dx = geom->worldBound.center.x - p.x, dy = geom->worldBound.center.y - p.y;
+					return std::sqrt(dx * dx + dy * dy);
+				}());
+			return;
+		}
+		if (auto* node = netimmerse_cast<RE::NiNode*>(a_obj)) {
+			for (auto& child : node->GetChildren()) {
+				ScanLodWater(child.get(), a_root, a_depth + 1, a_found, a_ws);
+			}
+		}
+	}
+
 	std::atomic<bool> g_pending{ false };
 
 	void Update()
@@ -291,6 +335,33 @@ namespace
 			}
 			if (ws->defaultDisplacementWaterObject && ws->currentWaterType) {
 				add(ws->defaultDisplacementWaterObject.get(), ws->currentWaterType, "default displacement object");
+				}
+				// The terrain LOD water (the world's LodWater type). Its shapes have no ZBufferTest flag, so the per-object loops below treat them
+				// like dummies and never repair or drive them: one shape came up with no textures and a scroll stuck at 0 (LODSCAN, 2026-10-20).
+				if (auto* tes = RE::TES::GetSingleton(); tes && tes->objLODWaterRoot) {
+					if (const auto* wsp = player->GetWorldspace(); wsp && wsp->lodWater) {
+						add(tes->objLODWaterRoot, wsp->lodWater, "LOD water");
+					}
+			}
+		}
+
+		{
+			static double sinceScan = 0.0;
+			static int    scans = 0;
+			sinceScan += dt;
+			if (sinceScan >= (scans < 20 ? 3.0 : 20.0) && scans < 80) {
+				sinceScan = 0.0;
+				++scans;
+				int  found = 0;
+				auto* tes = RE::TES::GetSingleton();
+				logger::info("LODSCAN pass {}: waterObjects={} objLODWaterRoot={} lodLandRoot={} waterRoot={}", scans, ws->waterObjects.size(), tes && tes->objLODWaterRoot != nullptr,
+					tes && tes->lodLandRoot != nullptr, ws->waterRoot != nullptr);
+				if (tes) {
+					ScanLodWater(tes->objLODWaterRoot, "objLODWaterRoot", 0, found, *ws);
+					ScanLodWater(tes->lodLandRoot, "lodLandRoot", 0, found, *ws);
+				}
+				ScanLodWater(ws->waterRoot.get(), "waterRoot", 0, found, *ws);
+				logger::info("LODSCAN pass {}: {} water shapes found", scans, found);
 			}
 		}
 
@@ -515,7 +586,8 @@ namespace
 	void OnMessage(SKSE::MessagingInterface::Message* a_msg)
 	{
 		if (a_msg->type == SKSE::MessagingInterface::kDataLoaded) {
-			logger::info("WaterWind 0.2 on game {}", REL::Module::get().version().string());
+			logger::info("WaterWind 1.0.0 on game {}", REL::Module::get().version().string());
+			WaterWindMenu::Register();
 			CaptureBases();
 			std::thread([]() {
 				for (;;) {

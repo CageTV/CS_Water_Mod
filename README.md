@@ -3,34 +3,37 @@
 Community Shaders optimized water overhaul for Skyrim SE/AE (Nexus: https://www.nexusmods.com/skyrimspecialedition/mods/172959).
 Inspired by TB's Improved Water (TheBlenderAnimator).
 
-This repository is the working backup of the mod: the plugins, textures, meshes, sounds and shader overrides, plus the SKSE plugins and helper scripts used while tuning it.
+This repository is the working backup of the mod: the plugins, textures, meshes, sounds and shader overrides, plus the SKSE plugins and helper scripts used while tuning it. The installer (FOMOD) is in the release zip.
 
-## State (2026-10-19, end of the night)
+## Version 1.2.0
 
-This is the test-list version, ahead of the Nexus release. Everything below was checked in game except where noted.
-
-### Plugins
-- `CS Water Mod.esp` (ESL) and `CS water Clean Needs Patch.esp`.
-- Cells that were hand-set to custom water types were compared against the game's own water (Update.esm winning); most were put back on vanilla types, then the water types were recoloured with the CS colours. Where cells dropped their water type (which made them fall back to DefaultWater), it was restored, and neighbouring cells were then made consistent.
-- Seams fixed so far: Morthal marsh, Riverwood lake, the (31,3)-(31,7) waterfall column, (25,-12)/(25,-11), (-21,20), (-9,26), (-27..-25,18), the NE sea block (cells x39-43, y12-17, now DefaultWater, 11 placed ice floes removed), and the river mouth at (38,14)/(39,14) (new type `CSWRiverMouthBlend`, halfway between the river and the sea).
-- Flow tiles `textures/water/skyrim.esm/flow.0.-15.dds` and `flow.0.-14.dds` have a blended left edge (river speed ramps up from the lake's still water). They are uncompressed DDS, the originals were BC7.
-- `DefaultWater` (ocean): textures set to oceanwater x2 + CSWCalmWater, WaterFresnel 0.4, SpecularSunSparkleMagnitude 0.25. These are test values.
-- Not yet fixed: other placed cover-up objects remain at (18,-17), (18,-18), (0,-14), (42,-24), (42,-25), (7,-8), (8,-6), (2,-13). LOD water direction (see below).
+### Water plugins
+- `CS Water Mod.esp` (ESL) for Anniversary Edition and a Special Edition variant without the one cell edit that needs the CC Tower mod. `CS water Clean Needs Patch.esp` is the optional iNeed patch.
+- Cells that were hand-set to custom water types were compared against the game's own water and most were put back on vanilla types, recoloured with the CS colours. Seams were fixed at Morthal marsh, Riverwood lake, the (31,3)-(31,7) waterfall column, (25,-12)/(25,-11), (-21,20), (-9,26), (-27..-25,18), the north-east sea block (cells x39-43, y12-17, 11 placed ice floes removed) and the river mouth at (38,14)/(39,14) (new type `CSWRiverMouthBlend`).
+- Flow tiles: 8 tiles that were stored as sRGB were re-encoded as linear, and 11 tile borders got a speed ramp (over 20 pixels) where two flowmap river cells met with different speeds.
+- Water sounds per water type: river, creek, lake and ocean each have their own sound, puddles are silent, and all of it is on one audio slider named "CSW-Water" in the game's Audio settings.
+- Shader tuning for Community Shaders (default), PIXL Renderer, Open Shaders and Bottled Shaders. Only the Community Shaders option has been checked in game for this release; the other three are carried over from 1.1.6 and are being re-tested.
 
 ### SKSE plugins (`skse-plugins/`)
-Built with alandtse's CommonLibSSE-NG for Skyrim 1.6.1170 and 1.7.x (SE/AE). Each folder holds `src/`, the `ng.cmake` that builds it (included from a parent CMake project that defines `ng_plugin()`), and the built DLL and ini as installed.
-- **WaterWind**: scales water scroll speed and wave height with the weather's wind, repairs per-cell water materials that come up with no normal textures, drives scroll on materials the engine never sets up, and does the same for the wading displacement patch around the player (which stopped the tile at the player's feet freezing). **The shipped `WaterWind.ini` is in test state** (forced storm wind: fCalmWind/fReferenceWind/fStormWind 0.01/0.02/0.03). The defaults in the source are 0.05/0.12/0.40.
-- **WaterWade**: wading slowdown by depth with armor swim penalties, the engine's wake patch length scaling with speed, and a speed-scaled splash (the game's own splash objects placed at the water surface). The wake-height setting (`bWakeHeight`) has no visible effect and is off.
-- **WaterProbe**: read-only diagnostic logger for water objects, materials, scroll and cell data.
+Built with alandtse's CommonLibSSE-NG. They use the Address Library, take no plugin slot, and get a settings page each in SKSE Menu Framework ("CS Water Mod / WaterWind", "CS Water Mod / WaterWade") when that mod is installed; otherwise every setting is a line in the `.ini`.
+- **WaterWind**: scales water scroll speed and wave height with the weather's wind, repairs per-cell water materials that come up with no normal textures, drives scroll on water (including the distant LOD water) that the engine leaves frozen, and does the same for the wading displacement patch around the player.
+- **WaterWade**: wading slowdown by depth with armor swim penalties, the engine's wake patch growing with speed, speed-scaled splashes, and an experimental foam wake for the ships of Animated Ships (Vicn). The ship wake is off by default; it attaches its own foam mesh to each ship's moving hull node and changes nothing in the ship mod. Wade In Water Redone is detected and WaterWade leaves the slowdown to it.
+- `WaterProbe`: read-only diagnostic logger (not part of the release).
+
+Tested on Skyrim 1.7.104. The plugins have not been run on Skyrim VR, SE 1.5.97 or AE versions before 1.6.1170; there is no build for VR or 1.5.97 because the older CommonLibSSE-NG does not have the water and shader structures these plugins read. On those versions install the mod without the SKSE plugins.
+
+### Building the plugins
+Each plugin folder has its `ng.cmake`, included from a parent CMake project that defines `ng_plugin()` and adds the CommonLibSSE-NG source of alandtse (`E:/WorkSpace/ng-build` here). `skse-plugins/shared/CswMenu.h` is the SKSE Menu Framework glue (resolved by name at run time, no SDK header). `skse-plugins/WaterWade/mesh/make_wake.py` writes the foam meshes with PyNifly.
 
 ### Helper scripts (`dev-tools/`)
-Python scripts used to compare cell water against the official masters, apply cell edits to Spriggit YAML, and blend flow tiles. They contain local paths and are kept for reference.
+Python scripts used to compare cell water against the official masters, apply cell edits to Spriggit YAML, blend flow tiles and set the water sounds. They contain local paths and are kept for reference.
 
-## Next
-- LOD water: the LOD water streaks run perpendicular to the real water; rotate it 90 degrees.
-- A few toggleable options for the SKSE plugins.
-- Support for Open Shaders, PXLR and Bottle Shader (renderer notes for Open Shaders / ENB / vanilla are still to be written).
-- Remaining seams in the cells listed above; regenerate AnvilLOD afterwards.
+## Known open points
+- Cover-up objects still placed by the plugin at (18,-17), (18,-18), (0,-14), (42,-24), (42,-25), (7,-8), (8,-6), (2,-13); river-mouth blends where a flowmap river meets cells without flowmap water.
+- The cells (-3,0) and (0,-2) lose their water type when WAVY Waterfalls Effect loads after this mod; load it before.
+
+## License
+MIT for the files written for this repository (see `LICENSE.txt`); the compiled plugins link alandtse's CommonLibSSE-NG and are distributed under the GPL, source in this repository. The water plugins, textures, meshes and sounds are not under that license.
 
 ## Credits
-TheBlenderAnimator (TB's Improved Water), the Community Shaders team, alandtse (CommonLibSSE-NG).
+TheBlenderAnimator (TB's Improved Water), the Community Shaders team, alandtse (CommonLibSSE-NG), Vicn (Animated Ships, only as the target of the optional ship wake), the SKSE Menu Framework authors.

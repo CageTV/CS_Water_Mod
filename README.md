@@ -5,6 +5,11 @@ Inspired by TB's Improved Water (TheBlenderAnimator).
 
 This repository is the working backup of the mod: the plugins, textures, meshes, sounds and shader overrides, plus the SKSE plugins and helper scripts used while tuning it. The installer (FOMOD) is in the release zip.
 
+## Version 1.2.1
+
+- `CS Water Mod.esp` (ESL) now works on Special Edition and Anniversary Edition alike. The one cell edit that needed the CC Tower mod (Morthal cells 0093BA/0093BB, location only; the water fix there stays) was removed, so there is no separate SE plugin.
+- The iNeed and Last Seed style "water causes damage" flag is now part of the main plugin (42 water records), so there is no separate patch plugin and no patch step in the installer.
+
 ## Version 1.2.0
 
 ### Water plugins

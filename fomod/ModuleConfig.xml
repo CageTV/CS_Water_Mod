@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
+  <moduleName>CS Water Mod</moduleName>
+  <moduleImage path="fomod\images\water_4.png" />
+
+  <requiredInstallFiles>
+    <file source="CS Water Mod\CS Water Mod.esp" destination="CS Water Mod.esp" />
+    <folder source="CS Water Mod\meshes" destination="meshes" />
+    <folder source="CS Water Mod\textures" destination="textures" />
+    <folder source="CS Water Mod\sound" destination="sound" />
+    <folder source="CS Water Mod\PBRNifPatcher" destination="PBRNifPatcher" />
+  </requiredInstallFiles>
+
+  <installSteps order="Explicit">
+    <installStep name="Renderer Shader Tuning">
+      <optionalFileGroups order="Explicit">
+        <group name="Renderer" type="SelectExactlyOne">
+          <plugins order="Explicit">
+            <plugin name="Community Shaders">
+              <description>Installs the water shader tuning built for Community Shaders (Shaders\WaterEffects\WaterCaustics.hlsli and WaterParallax.hlsli - tuned parallax depth and caustics brightness).
+
+IMPORTANT: for this to take effect, "CS Water Mod" must be placed BELOW "Community Shaders" in your mod list load order (Mod Organizer 2 left pane). If placed above, Community Shaders' original shader files will be used instead and these changes will not apply.
+
+Pick this if you run Community Shaders (not PIXL Renderer, not Open Shaders, not ENB). Open Shaders users: pick the Open Shaders option instead, these files do not match Open Shaders' water shaders.</description>
+              <image path="fomod\images\water_2.jpg" />
+              <files>
+                <folder source="CS Water Mod\Shaders" destination="Shaders" />
+              </files>
+              <typeDescriptor>
+                <type name="Recommended" />
+              </typeDescriptor>
+            </plugin>
+            <plugin name="PIXL Renderer">
+              <description>Installs the equivalent water shader tuning built for PIXL Renderer's own Water Optics module (Shaders\WaterOptics\WaterCaustics.hlsli and WaterParallax.hlsli). PIXL is a separate fork/replacement for Community Shaders with its own renamed water shaders, so the Community Shaders files above will not work with it - this is a distinct override built against PIXL's actual source.
+
+IMPORTANT: PIXL replaces Community Shaders entirely (do not run both). For this override to take effect, "CS Water Mod" must be placed BELOW "PIXL Renderer" in your mod list load order.
+
+Pick this if you run PIXL Renderer (not Community Shaders, not ENB).</description>
+              <image path="fomod\images\water_1.jpg" />
+              <files>
+                <folder source="CS Water Mod\Shaders-PIXL" destination="Shaders" />
+              </files>
+              <typeDescriptor>
+                <type name="Optional" />
+              </typeDescriptor>
+            </plugin>
+            <plugin name="Open Shaders">
+              <description>Installs the water tuning for Open Shaders as a settings override (SKSE\Plugins\CommunityShaders\Overrides\CSWaterMod_CSUtility.json): water parallax strength 1.5, parallax quality 24 and caustics strength 1.5, the same +50% depth and brightness the Community Shaders files apply. No shader files are installed, so it does not replace anything of Open Shaders and keeps working when Open Shaders updates. Tested with Open Shaders 2.18.0.
+
+Open Shaders has rewritten the water shader files, so the Community Shaders files above will NOT work with it - do not pick that option if you run Open Shaders.
+
+Load order does not matter for this option. To change the values afterwards use Open Shaders' CS Utility > Water page, or disable the file under Utilities > Feature Overwrites.
+
+Pick this if you run Open Shaders (not Community Shaders, not PIXL Renderer, not ENB).</description>
+              <image path="fomod\images\water_2.jpg" />
+              <files>
+                <folder source="CS Water Mod\Shaders-OpenShaders" destination="" />
+              </files>
+              <typeDescriptor>
+                <type name="Optional" />
+              </typeDescriptor>
+            </plugin>
+            <plugin name="Bottled Shaders">
+              <description>Installs the water shader tuning built for Bottled Shaders (Shaders\WaterEffects\WaterCaustics.hlsli and WaterParallax.hlsli): parallax depth +50% for still water and for rivers and waterfalls, parallax steps 16 to 24, and caustics brightness +50%. Bottled Shaders rewrote these two files, so the Community Shaders files above will not work with it - these are copies of Bottled's own files with only those values changed. Tested with Bottled Shaders 1.0.16.
+
+IMPORTANT: for this to take effect, "CS Water Mod" must be placed BELOW "Bottled Shaders" in your mod list load order (Mod Organizer 2 left pane). If placed above, Bottled's original shader files will be used instead and these changes will not apply. After a Bottled Shaders update, reinstall this option if the water looks untuned.
+
+Pick this if you run Bottled Shaders (not Community Shaders, not Open Shaders, not PIXL Renderer, not ENB).</description>
+              <image path="fomod\images\water_4.png" />
+              <files>
+                <folder source="CS Water Mod\Shaders-Bottled" destination="Shaders" />
+              </files>
+              <typeDescriptor>
+                <type name="Optional" />
+              </typeDescriptor>
+            </plugin>
+            <plugin name="None">
+              <description>Skip the shader tuning entirely. Pick this for ENB or any renderer other than Community Shaders/PIXL Renderer/Open Shaders/Bottled Shaders. All water textures, meshes, sounds and water records still install either way.</description>
+              <image path="fomod\images\water_1.jpg" />
+              <files />
+              <typeDescriptor>
+                <type name="Optional" />
+              </typeDescriptor>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+
+    <installStep name="SKSE Plugins">
+      <optionalFileGroups order="Explicit">
+        <group name="WaterWind and WaterWade" type="SelectExactlyOne">
+          <plugins order="Explicit">
+            <plugin name="Install WaterWind and WaterWade (Skyrim SE / AE 1.6.x and 1.7.x)">
+              <description>Two small SKSE plugins that go with the water records. WaterWind scales the water scroll speed and wave height with the weather's wind, repairs water that comes up without normal textures (including the distant LOD water) and keeps the flowmap water moving. WaterWade slows actors by how deep they wade, grows the wading wake with speed, adds splashes and has an experimental wake for the ships of Animated Ships (off by default). Both add their own pages to the SKSE Menu Framework (CS Water Mod / WaterWind and WaterWade) when that mod is installed; otherwise the settings are in the two .ini files.
+
+Needs SKSE and the Address Library. Built for Skyrim SE/AE and tested on 1.7.104. The plugins add nothing to your plugin list. Skyrim VR and Skyrim 1.5.97 are not supported by these two plugins: pick the next option there.</description>
+              <image path="fomod\images\water_2.jpg" />
+              <files>
+                <folder source="CS Water Mod SKSE" destination="" />
+              </files>
+              <typeDescriptor><dependencyType><defaultType name="Optional"/><patterns>
+                <pattern><dependencies><gameDependency version="1.6.1170.0"/></dependencies><type name="Recommended"/></pattern>
+              </patterns></dependencyType></typeDescriptor>
+            </plugin>
+            <plugin name="No SKSE plugins (Skyrim VR, 1.5.97, or I do not want them)">
+              <description>Install only the water plugin, textures, meshes and sounds. The water works without WaterWind and WaterWade; the wind-driven scroll and wave height, the repair of water without normal textures, wading slowdown, splashes and the ship wake are simply not there.</description>
+              <image path="fomod\images\water_1.jpg" />
+              <files />
+              <typeDescriptor><dependencyType><defaultType name="Recommended"/><patterns>
+                <pattern><dependencies><gameDependency version="1.6.1170.0"/></dependencies><type name="Optional"/></pattern>
+              </patterns></dependencyType></typeDescriptor>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
+  </installSteps>
+</config>

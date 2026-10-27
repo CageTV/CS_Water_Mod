@@ -1,0 +1,13 @@
+{
+    "water": {
+        "parallaxStrength": 1.5,
+        "parallaxQuality": 24,
+        "causticsStrength": 1.5
+    },
+    "_metadata": {
+        "modName": "CS Water Mod",
+        "version": "1.1.6",
+        "description": "Water parallax depth +50% (still and flowmap), parallax steps 16 to 24, caustics +50%. Open Shaders settings equivalent of the Community Shaders WaterParallax.hlsli / WaterCaustics.hlsli tuning.",
+        "enabled": true
+    }
+}

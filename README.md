@@ -5,6 +5,14 @@ Inspired by TB's Improved Water (TheBlenderAnimator).
 
 This repository is the working backup of the mod: the plugins, textures, meshes, sounds and shader overrides, plus the SKSE plugins and helper scripts used while tuning it. The installer (FOMOD) is in the release zip.
 
+## Version 1.3.0
+
+- The mod no longer ships water flow maps (`textures/water/skyrim.esm`, 749 files). Rivers and streams use the game's own flow maps. The tiles it shipped made the flow along the river from Riverwood to the Guardian Stones slow and broken.
+- `CS Water Mod.esp` (ESL), still one plugin for Special Edition and Anniversary Edition. Cells (-24,12), (11,-2), (24,-3), (20,-6), (7,-10), (2,-11), (1,-12), (3,-14), (2,-14), (-5,-12), (-6,-12) and (0,-16) are now covered by the plugin. The Solstheim worldspace record with its four cells and the cells (19,11), (-6,15) and (-7,15) were removed.
+- The "water causes damage" flag is no longer set on 8 water types: dunSleepingTreeCampWater, MurkyWater, HelgenWater, ClearInteriorWaterAnkleHeightStill, DefaultIntWaterAnkleHeightStill, ShadowmereWater, HorseTroughWater01 and MarkarthWaterFlow (34 of the 42 keep it).
+- Installer: the same options as 1.2.1 (renderer tuning for Community Shaders, PIXL Renderer, Open Shaders or Bottled Shaders, and the optional SKSE plugins); the flow maps are no longer part of the required files. The installer sources are in `fomod/` and the shader folders `Shaders*` of this repository.
+- If you installed an older version in place, delete its `textures/water/skyrim.esm` folder, or install this one as a new mod.
+
 ## Version 1.2.1
 
 - `CS Water Mod.esp` (ESL) now works on Special Edition and Anniversary Edition alike. The one cell edit that needed the CC Tower mod (Morthal cells 0093BA/0093BB, location only; the water fix there stays) was removed, so there is no separate SE plugin.

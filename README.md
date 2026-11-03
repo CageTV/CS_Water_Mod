@@ -5,6 +5,12 @@ Inspired by TB's Improved Water (TheBlenderAnimator).
 
 This repository is the working backup of the mod: the plugins, textures, meshes, sounds and shader overrides, plus the SKSE plugins and helper scripts used while tuning it. The installer (FOMOD) is in the release zip.
 
+## Version 1.4.0
+
+- New installer option **Community Shaders 2.0 (development build)**, checked in game with the dev snapshot built from commit e296f96. Community Shaders 2.0 rewrote `WaterParallax.hlsli`, so the 1.9.x files do not work with it; `Shaders-CS2/` holds the 2.0 files with the same tuning (parallax strength +50%, steps 16 to 24, caustics +50%).
+- The previous Community Shaders option is now named **Community Shaders 1.9.1 and lower** and is unchanged.
+- Nothing else changed (plugin, textures, meshes, sounds and the SKSE plugins are as in 1.3.0).
+
 ## Version 1.3.0
 
 - The mod no longer ships water flow maps (`textures/water/skyrim.esm`, 749 files). Rivers and streams use the game's own flow maps. The tiles it shipped made the flow along the river from Riverwood to the Guardian Stones slow and broken.

@@ -16,18 +16,32 @@
       <optionalFileGroups order="Explicit">
         <group name="Renderer" type="SelectExactlyOne">
           <plugins order="Explicit">
-            <plugin name="Community Shaders">
+            <plugin name="Community Shaders 1.9.1 and lower">
               <description>Installs the water shader tuning built for Community Shaders (Shaders\WaterEffects\WaterCaustics.hlsli and WaterParallax.hlsli - tuned parallax depth and caustics brightness).
 
 IMPORTANT: for this to take effect, "CS Water Mod" must be placed BELOW "Community Shaders" in your mod list load order (Mod Organizer 2 left pane). If placed above, Community Shaders' original shader files will be used instead and these changes will not apply.
 
-Pick this if you run Community Shaders (not PIXL Renderer, not Open Shaders, not ENB). Open Shaders users: pick the Open Shaders option instead, these files do not match Open Shaders' water shaders.</description>
+Pick this if you run the current Community Shaders release (1.9.1) or an older one (not the 2.0 development build, PIXL Renderer, Open Shaders or ENB). Open Shaders users: pick the Open Shaders option instead, these files do not match Open Shaders' water shaders.</description>
               <image path="fomod\images\water_2.jpg" />
               <files>
                 <folder source="CS Water Mod\Shaders" destination="Shaders" />
               </files>
               <typeDescriptor>
                 <type name="Recommended" />
+              </typeDescriptor>
+            </plugin>
+            <plugin name="Community Shaders 2.0 (development build)">
+              <description>Installs the same water shader tuning for the new Community Shaders 2.0 (the "dev" branch of github.com/community-shaders/skyrim-community-shaders, built from commit e296f96): parallax depth +50% for still water and for rivers and waterfalls, parallax steps 16 to 24, and caustics brightness +50%. Community Shaders 2.0 rewrote WaterParallax.hlsli (new function signatures, a 64 step cap, marching from the mean water height), so the files of the option above do not compile with it and would break the water. These are copies of the 2.0 files with only those values changed.
+
+IMPORTANT: "CS Water Mod" must be placed BELOW "Community Shaders" in your mod list load order, or the original shader files are used and these changes do not apply. Checked in game with that one 2.0 snapshot; a later 2.0 build may change these files again, in which case reinstall this option once the mod is updated.
+
+Pick this only if you run the Community Shaders 2.0 development build.</description>
+              <image path="fomod\images\water_2.jpg" />
+              <files>
+                <folder source="CS Water Mod\Shaders-CS2" destination="Shaders" />
+              </files>
+              <typeDescriptor>
+                <type name="Optional" />
               </typeDescriptor>
             </plugin>
             <plugin name="PIXL Renderer">

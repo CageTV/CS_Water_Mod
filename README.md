@@ -5,6 +5,13 @@ Inspired by TB's Improved Water (TheBlenderAnimator).
 
 This repository is the working backup of the mod: the plugins, textures, meshes, sounds and shader overrides, plus the SKSE plugins and helper scripts used while tuning it. The installer (FOMOD) is in the release zip.
 
+## Version 1.4.1
+
+- **Bottled Shaders**: rebuilt the override from Bottled Shaders 1.0.28's own water files (its `ComputeCaustics` gained a `pixelPos` argument, so the old override no longer compiled). Same tuning as before: parallax depth +50%, steps 16 to 24, caustics dispersion x4 to x6.
+- **PIXL Renderer**: the option no longer installs shader files. PIXL 1.0.9 ships its own rewritten Water Optics v2.0 (new functions and settings in PIXL's menu), which the old override would have broken. Tune caustics in PIXL's menu.
+- **Open Shaders**: unchanged (settings override; its keys still exist in 2.21).
+- Nothing else changed.
+
 ## Version 1.4.0
 
 - New installer option **Community Shaders 2.0 (development build)**, checked in game with the dev snapshot built from commit e296f96. Community Shaders 2.0 rewrote `WaterParallax.hlsli`, so the 1.9.x files do not work with it; `Shaders-CS2/` holds the 2.0 files with the same tuning (parallax strength +50%, steps 16 to 24, caustics +50%).

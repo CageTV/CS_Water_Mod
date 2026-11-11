@@ -45,15 +45,10 @@ Pick this only if you run the Community Shaders 2.0 development build.</descript
               </typeDescriptor>
             </plugin>
             <plugin name="PIXL Renderer">
-              <description>Installs the equivalent water shader tuning built for PIXL Renderer's own Water Optics module (Shaders\WaterOptics\WaterCaustics.hlsli and WaterParallax.hlsli). PIXL is a separate fork/replacement for Community Shaders with its own renamed water shaders, so the Community Shaders files above will not work with it - this is a distinct override built against PIXL's actual source.
-
-IMPORTANT: PIXL replaces Community Shaders entirely (do not run both). For this override to take effect, "CS Water Mod" must be placed BELOW "PIXL Renderer" in your mod list load order.
+              <description>No shader files are installed. PIXL Renderer 1.0.9 and later ship their own rewritten Water Optics module (v2.0) with caustics and parallax settings in PIXL's own menu, so the water shaders are left exactly as PIXL provides them. All water textures, meshes, sounds and water records still install. Tune caustics in PIXL's menu.
 
 Pick this if you run PIXL Renderer (not Community Shaders, not ENB).</description>
               <image path="fomod\images\water_1.jpg" />
-              <files>
-                <folder source="CS Water Mod\Shaders-PIXL" destination="Shaders" />
-              </files>
               <typeDescriptor>
                 <type name="Optional" />
               </typeDescriptor>

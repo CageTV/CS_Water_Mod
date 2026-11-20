@@ -186,16 +186,34 @@ namespace
 		return 1.0f + (a_stormScale - 1.0f) * Smoothstep((a_wind - c.referenceWind) / (c.stormWind - c.referenceWind));
 	}
 
+	// the water material of a geometry's shader property, or nullptr
+	RE::BSWaterShaderMaterial* WaterMaterialOf(RE::BSGeometry* a_geom)
+	{
+		auto* prop = a_geom ? netimmerse_cast<RE::BSWaterShaderProperty*>(a_geom->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
+		if (!prop || !prop->material || prop->material->GetType() != RE::BSShaderMaterial::Type::kWater) {
+			return nullptr;
+		}
+		return static_cast<RE::BSWaterShaderMaterial*>(prop->material);
+	}
+
+	// A water material found under a node, together with its geometry. The geometry is held so the material cannot be freed
+	// while a tick still uses it: the engine can drop a displacement or LOD water geometry while a tick runs (on 1.7 SKSE tasks
+	// can run on a worker thread next to the game's own jobs), and the game then hands the freed memory to another object.
+	struct FoundMaterial
+	{
+		RE::NiPointer<RE::BSGeometry> geom;
+		RE::BSWaterShaderMaterial*    mat;
+	};
+
 	// the displacement patch the engine draws around an actor wading in water has its own geometry and water material
-	void CollectWaterMaterials(RE::NiAVObject* a_obj, std::vector<RE::BSWaterShaderMaterial*>& a_out, int a_depth = 0)
+	void CollectWaterMaterials(RE::NiAVObject* a_obj, std::vector<FoundMaterial>& a_out, int a_depth = 0)
 	{
 		if (!a_obj || a_depth > 6) {
 			return;
 		}
 		if (auto* geom = netimmerse_cast<RE::BSGeometry*>(a_obj)) {
-			auto* prop = netimmerse_cast<RE::BSWaterShaderProperty*>(geom->GetGeometryRuntimeData().shaderProperty.get());
-			if (prop && prop->material && prop->material->GetType() == RE::BSShaderMaterial::Type::kWater) {
-				a_out.push_back(static_cast<RE::BSWaterShaderMaterial*>(prop->material));
+			if (auto* m = WaterMaterialOf(geom)) {
+				a_out.push_back({ RE::NiPointer<RE::BSGeometry>(geom), m });
 			}
 			return;
 		}
@@ -299,24 +317,34 @@ namespace
 			}
 		}
 
-		std::vector<std::pair<RE::BSWaterShaderMaterial*, const RE::TESWaterForm*>> extras;
+		// Each entry keeps its geometry until the end of the tick, and every write first checks that the geometry still has this
+		// material: a material pointer kept from the walk must never be written through once its geometry let go of it.
+		struct Extra
+		{
+			RE::NiPointer<RE::BSGeometry> geom;
+			RE::BSWaterShaderMaterial*    mat;
+			const RE::TESWaterForm*       type;
+
+			bool Live() const { return WaterMaterialOf(geom.get()) == mat; }
+		};
+		std::vector<Extra> extras;
 		{
 			static std::set<const void*> seen;
 			auto add = [&](RE::NiAVObject* a_geom, const RE::TESWaterForm* a_type, const char* a_where) {
 				if (!a_geom || !a_type) {
 					return;
 				}
-				std::vector<RE::BSWaterShaderMaterial*> found;
+				std::vector<FoundMaterial> found;
 				CollectWaterMaterials(a_geom, found);
-				for (auto* m : found) {
+				for (auto& [g, m] : found) {
 					bool dup = false;
 					for (auto& e : extras) {
-						dup = dup || e.first == m;
+						dup = dup || e.mat == m;
 					}
 					if (dup) {
 						continue;
 					}
-					extras.emplace_back(m, a_type);
+					extras.push_back({ g, m, a_type });
 					if (seen.insert(m).second && seen.size() < 40) {
 						logger::info("displacement water material {:p} ({}, {}): normalTexture1={} scroll1=({:.3f},{:.3f})", static_cast<const void*>(m), Name(a_type), a_where,
 							m->normalTexture1 ? m->normalTexture1->name.c_str() : "NULL", m->normalScroll1.x, m->normalScroll1.y);
@@ -443,8 +471,10 @@ namespace
 					logger::info("texture fix: {} had a material without normal textures, gave it '{}'", Name(obj->waterType), it->second->normalTexture1->name.c_str());
 				}
 			}
-			for (auto& [m, type] : extras) {
-				if (m->normalTexture1) {
+			for (auto& e : extras) {
+				auto* const       m = e.mat;
+				const auto* const type = e.type;
+				if (!e.Live() || m->normalTexture1) {
 					continue;
 				}
 				const auto it = donors.find(type);
@@ -516,8 +546,10 @@ namespace
 				}
 				driveOne(static_cast<RE::BSWaterShaderMaterial*>(prop->material), obj->waterType);
 			}
-			for (auto& [m, type] : extras) {
-				driveOne(m, type);
+			for (auto& e : extras) {
+				if (e.Live()) {
+					driveOne(e.mat, e.type);
+				}
 			}
 			for (auto it = g_stalls.begin(); it != g_stalls.end();) {
 				it = alive.contains(it->first) ? std::next(it) : g_stalls.erase(it);
@@ -548,8 +580,10 @@ namespace
 			++materials;
 		}
 
-		for (auto& [mat, type] : extras) {
-			if (type->flags.any(RE::TESWaterForm::Flag::kEnableFlowmap) && !cfg.affectFlowmapWater) {
+		for (auto& e : extras) {
+			auto* const       mat = e.mat;
+			const auto* const type = e.type;
+			if (!e.Live() || (type->flags.any(RE::TESWaterForm::Flag::kEnableFlowmap) && !cfg.affectFlowmapWater)) {
 				continue;
 			}
 			for (int i = 0; i < 3; ++i) {

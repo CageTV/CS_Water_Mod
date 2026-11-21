@@ -186,16 +186,34 @@ namespace
 		return 1.0f + (a_stormScale - 1.0f) * Smoothstep((a_wind - c.referenceWind) / (c.stormWind - c.referenceWind));
 	}
 
+	// the water material of a geometry's shader property, or nullptr
+	RE::BSWaterShaderMaterial* WaterMaterialOf(RE::BSGeometry* a_geom)
+	{
+		auto* prop = a_geom ? netimmerse_cast<RE::BSWaterShaderProperty*>(a_geom->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
+		if (!prop || !prop->material || prop->material->GetType() != RE::BSShaderMaterial::Type::kWater) {
+			return nullptr;
+		}
+		return static_cast<RE::BSWaterShaderMaterial*>(prop->material);
+	}
+
+	// A water material found under a node, together with its geometry. The geometry is held so the material cannot be freed
+	// while a tick still uses it: the engine can drop a displacement or LOD water geometry while a tick runs (on 1.7 SKSE tasks
+	// can run on a worker thread next to the game's own jobs), and the game then hands the freed memory to another object.
+	struct FoundMaterial
+	{
+		RE::NiPointer<RE::BSGeometry> geom;
+		RE::BSWaterShaderMaterial*    mat;
+	};
+
 	// the displacement patch the engine draws around an actor wading in water has its own geometry and water material
-	void CollectWaterMaterials(RE::NiAVObject* a_obj, std::vector<RE::BSWaterShaderMaterial*>& a_out, int a_depth = 0)
+	void CollectWaterMaterials(RE::NiAVObject* a_obj, std::vector<FoundMaterial>& a_out, int a_depth = 0)
 	{
 		if (!a_obj || a_depth > 6) {
 			return;
 		}
 		if (auto* geom = netimmerse_cast<RE::BSGeometry*>(a_obj)) {
-			auto* prop = netimmerse_cast<RE::BSWaterShaderProperty*>(geom->GetGeometryRuntimeData().shaderProperty.get());
-			if (prop && prop->material && prop->material->GetType() == RE::BSShaderMaterial::Type::kWater) {
-				a_out.push_back(static_cast<RE::BSWaterShaderMaterial*>(prop->material));
+			if (auto* m = WaterMaterialOf(geom)) {
+				a_out.push_back({ RE::NiPointer<RE::BSGeometry>(geom), m });
 			}
 			return;
 		}
@@ -299,24 +317,34 @@ namespace
 			}
 		}
 
-		std::vector<std::pair<RE::BSWaterShaderMaterial*, const RE::TESWaterForm*>> extras;
+		// Each entry keeps its geometry until the end of the tick, and every write first checks that the geometry still has this
+		// material: a material pointer kept from the walk must never be written through once its geometry let go of it.
+		struct Extra
+		{
+			RE::NiPointer<RE::BSGeometry> geom;
+			RE::BSWaterShaderMaterial*    mat;
+			const RE::TESWaterForm*       type;
+
+			bool Live() const { return WaterMaterialOf(geom.get()) == mat; }
+		};
+		std::vector<Extra> extras;
 		{
 			static std::set<const void*> seen;
 			auto add = [&](RE::NiAVObject* a_geom, const RE::TESWaterForm* a_type, const char* a_where) {
 				if (!a_geom || !a_type) {
 					return;
 				}
-				std::vector<RE::BSWaterShaderMaterial*> found;
+				std::vector<FoundMaterial> found;
 				CollectWaterMaterials(a_geom, found);
-				for (auto* m : found) {
+				for (auto& [g, m] : found) {
 					bool dup = false;
 					for (auto& e : extras) {
-						dup = dup || e.first == m;
+						dup = dup || e.mat == m;
 					}
 					if (dup) {
 						continue;
 					}
-					extras.emplace_back(m, a_type);
+					extras.push_back({ g, m, a_type });
 					if (seen.insert(m).second && seen.size() < 40) {
 						logger::info("displacement water material {:p} ({}, {}): normalTexture1={} scroll1=({:.3f},{:.3f})", static_cast<const void*>(m), Name(a_type), a_where,
 							m->normalTexture1 ? m->normalTexture1->name.c_str() : "NULL", m->normalScroll1.x, m->normalScroll1.y);
@@ -443,8 +471,10 @@ namespace
 					logger::info("texture fix: {} had a material without normal textures, gave it '{}'", Name(obj->waterType), it->second->normalTexture1->name.c_str());
 				}
 			}
-			for (auto& [m, type] : extras) {
-				if (m->normalTexture1) {
+			for (auto& e : extras) {
+				auto* const       m = e.mat;
+				const auto* const type = e.type;
+				if (!e.Live() || m->normalTexture1) {
 					continue;
 				}
 				const auto it = donors.find(type);
@@ -516,8 +546,10 @@ namespace
 				}
 				driveOne(static_cast<RE::BSWaterShaderMaterial*>(prop->material), obj->waterType);
 			}
-			for (auto& [m, type] : extras) {
-				driveOne(m, type);
+			for (auto& e : extras) {
+				if (e.Live()) {
+					driveOne(e.mat, e.type);
+				}
 			}
 			for (auto it = g_stalls.begin(); it != g_stalls.end();) {
 				it = alive.contains(it->first) ? std::next(it) : g_stalls.erase(it);
@@ -548,8 +580,10 @@ namespace
 			++materials;
 		}
 
-		for (auto& [mat, type] : extras) {
-			if (type->flags.any(RE::TESWaterForm::Flag::kEnableFlowmap) && !cfg.affectFlowmapWater) {
+		for (auto& e : extras) {
+			auto* const       mat = e.mat;
+			const auto* const type = e.type;
+			if (!e.Live() || (type->flags.any(RE::TESWaterForm::Flag::kEnableFlowmap) && !cfg.affectFlowmapWater)) {
 				continue;
 			}
 			for (int i = 0; i < 3; ++i) {
@@ -583,12 +617,51 @@ namespace
 		spdlog::set_pattern("[%H:%M:%S.%e] %v");
 	}
 
+	// The engine's own pass over the water objects: Main::RenderWaterEffects calls TESWaterSystem::UpdateForCamera on the
+	// main thread for every frame it draws (the call loads the water system into RCX and the camera into RDX; checked on
+	// 1.5.97, 1.6.1170 and 1.7.104). The work runs right after it, on that thread, at the moment the engine itself walks
+	// and updates the same water objects, about ten times a second as before. A queued SKSE task gave no such guarantee:
+	// on 1.7 it can run on a worker thread while the game's jobs add and remove water geometry.
+	struct WaterUpdateHook
+	{
+		static void thunk(RE::TESWaterSystem* a_system, void* a_camera)
+		{
+			func(a_system, a_camera);
+			static auto last = std::chrono::steady_clock::now();
+			const auto  now = std::chrono::steady_clock::now();
+			if (now - last >= 100ms) {
+				last = now;
+				Update();
+			}
+		}
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
+
+	bool InstallWaterUpdateHook()
+	{
+		const auto addr = REL::RelocationID(35561, 36560).address() + REL::Relocate(0xE2, 0xE9);
+		if (*reinterpret_cast<const std::uint8_t*>(addr) != 0xE8) {
+			logger::error("water update call site at {:#x} is not a call instruction; updating from a queued task instead", addr);
+			return false;
+		}
+		// TESWaterSystem::UpdateForCamera; another target means another mod hooks this call too (the hook chains after it)
+		const auto target = addr + 5 + *reinterpret_cast<const std::int32_t*>(addr + 1);
+		if (target != REL::RelocationID(31383, 32174).address())
+			logger::info("water update call at {:#x} already leads to {:#x} (another mod's hook); chaining after it", addr, target);
+		SKSE::AllocTrampoline(14);
+		WaterUpdateHook::func = SKSE::GetTrampoline().write_call<5>(addr, WaterUpdateHook::thunk);
+		logger::info("water update hook installed at {:#x}: updates run with the engine's own water pass", addr);
+		return true;
+	}
+
 	void OnMessage(SKSE::MessagingInterface::Message* a_msg)
 	{
 		if (a_msg->type == SKSE::MessagingInterface::kDataLoaded) {
 			logger::info("WaterWind 1.0.0 on game {}", REL::Module::get().version().string());
 			WaterWindMenu::Register();
 			CaptureBases();
+			if (InstallWaterUpdateHook())
+				return;
 			std::thread([]() {
 				for (;;) {
 					std::this_thread::sleep_for(100ms);

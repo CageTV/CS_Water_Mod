@@ -124,5 +124,28 @@ Needs SKSE and the Address Library. Built for Skyrim SE/AE and tested on 1.7.104
         </group>
       </optionalFileGroups>
     </installStep>
+
+    <installStep name="Patches">
+      <optionalFileGroups order="Explicit">
+        <group name="Patches for other mods" type="SelectAny">
+          <plugins order="Explicit">
+            <plugin name="BS Bruma Water Patch">
+              <description>Gives the water types of BS Bruma (BSHeartland.esm: the lakes and rivers of Cyrodiil) the same look as the rest of this mod: the CS Water noise textures, depth, fog, specular and reflection settings. BS Bruma has its own water records that this mod does not touch, so without the patch they keep vanilla-style values and the water looks flat and dark, with a visible seam where it meets cells that use the default water. The muddy brown and near-black water types are also given this mod's colours so they blend with the default water; the blue ones and the creek keep Bruma's own colours.
+
+Needs BS Bruma (BSAssets.esm, BSHeartland.esm). Light plugin (ESL), no new records, 11 water records overridden. It must load after BSHeartland.esm and after "CS Water Mod.esp".
+
+Pick this only if you use BS Bruma.</description>
+              <image path="fomod\images\water_4.png" />
+              <files>
+                <file source="CS Water Mod Patches\CS Water Mod - BS Bruma Water Patch.esp" destination="CS Water Mod - BS Bruma Water Patch.esp" />
+              </files>
+              <typeDescriptor>
+                <type name="Optional" />
+              </typeDescriptor>
+            </plugin>
+          </plugins>
+        </group>
+      </optionalFileGroups>
+    </installStep>
   </installSteps>
 </config>

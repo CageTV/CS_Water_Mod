@@ -5,6 +5,10 @@ Inspired by TB's Improved Water (TheBlenderAnimator).
 
 This repository is the working backup of the mod: the plugins, textures, meshes, sounds and shader overrides, plus the SKSE plugins and helper scripts used while tuning it. The installer (FOMOD) is in the release zip.
 
+## Version 1.5.0
+
+- **BS Bruma Water Patch** (optional installer step, `patches/CS Water Mod - BS Bruma Water Patch.esp`, ESL): BS Bruma's 11 own water types (BSHeartland.esm) keep vanilla-style values, so Bruma's lakes looked flat and dark and showed a hard seam against cells that use the default water. The patch gives them this mod's noise textures, depth, fog, specular and reflection settings. The muddy brown and near-black types (`BSHeartlandWater`, `_S231917_D221F13`, `_S1E1917_D212219`, `_S1E1917_D222219`, `_S1F1917_D222219`) also get this mod's colours; the blue and slate-blue types and `CYRCreekWaterFlow` keep Bruma's colours. Must load after BSHeartland.esm and CS Water Mod.esp.
+
 ## Version 1.4.1
 
 - **Bottled Shaders**: rebuilt the override from Bottled Shaders 1.0.28's own water files (its `ComputeCaustics` gained a `pixelPos` argument, so the old override no longer compiled). Same tuning as before: parallax depth +50%, steps 16 to 24, caustics dispersion x4 to x6.
